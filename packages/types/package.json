@@ -1,0 +1,8 @@
+{
+  "name": "@poker-web/types",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Global types for poker app",
+  "main": "index.ts",
+  "license": "MIT"
+}

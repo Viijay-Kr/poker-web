@@ -1,0 +1,19 @@
+{
+  "name": "poker-web",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Poker app with react js in the front-end and node js in the back-end",
+  "main": "index.ts",
+  "author": "VijayK",
+  "license": "MIT",
+  "workspaces": {
+    "packages": [
+      "packages/*"
+    ]
+  },
+  "scripts": {
+    "server": "cd packages/server && yarn start",
+    "client": "cd packages/client && yarn start",
+    "start": "concurrently \"yarn server\" \"yarn client\" "
+  }
+}

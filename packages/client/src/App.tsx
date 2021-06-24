@@ -1,17 +1,20 @@
 import React, { useState } from "react";
-import joinTable from "./services/game";
-
+import joinTable from "services/game";
+import { Player } from "@poker-web/types";
+import Table from "features/Table/Table";
 function App() {
   const [joinedTable, setJoinedTable] = useState(false);
-  const [playersCount, setPlayersCount] = useState(0);
+  const [currentPlayer, setCurrentPlayer] = useState("");
+  const [players, setPlayers] = useState<Player[]>();
   const onSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const playerName = data.get("player-name");
     if (playerName !== null) {
-      joinTable(playerName.toString(), (playersCount) => {
+      joinTable(playerName.toString(), (players) => {
         setJoinedTable(true);
-        setPlayersCount(playersCount);
+        setCurrentPlayer(playerName.toString());
+        setPlayers(players);
       });
     }
   };
@@ -24,6 +27,7 @@ function App() {
           <input type="submit" value="Enter Table" />
         </form>
       )}
+      {players && <Table players={players} currentPlayerName={currentPlayer} />}
     </div>
   );
 }

@@ -44,7 +44,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
   > = {
     high_card: () => {
       let winningPlayer: Player | undefined;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         const sortedCards = player.cards.sort(
           (a, b) => cardsWeight[b.kind] - cardsWeight[a.kind]
         );
@@ -62,7 +62,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     },
     pair: () => {
       let winningPlayer;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const [card1, card2] = player.cards;
         // find the highest card of the two cards and compute its weight
@@ -92,7 +92,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     },
     two_pair: () => {
       let winningPlayer;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const [card1, card2] = player.cards;
         const firstMatchedPair = communityCards.find(
@@ -134,7 +134,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     },
     trips: () => {
       let winningPlayer;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const [card1, card2] = player.cards;
         // find the highest three of a kind
@@ -172,7 +172,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     quads: () => {
       // Handle four of a kind here
       let winningPlayer;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const [card1, card2] = player.cards;
         const allCards = [card1, card2].concat(communityCards);
@@ -207,7 +207,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     },
     full_house: () => {
       let winningPlayer;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const [card1, card2] = player.cards;
         let fullHouse: Partial<Record<Kind, number>> = {};
@@ -258,7 +258,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     },
     flush: () => {
       let winningPlayer;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const [card1, card2] = player.cards;
         let flush: Flush = {};
@@ -302,7 +302,7 @@ const computeWinner = (players: Players, communityCards: Card[]) => {
     straight_flush: () => ({ wonBy: "straight_flush" }),
     straight: () => {
       let winningPlayer: Player | undefined;
-      toPlayersList(players).reduce((acc, player) => {
+      toPlayersList(players).reduce((acc, {player}) => {
         let currentPlayerWeight = 0;
         const allCards = player.cards
           .concat(communityCards)

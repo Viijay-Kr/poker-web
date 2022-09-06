@@ -7,7 +7,7 @@ import {
 import { useEffect, useState } from "react";
 import { getSocketInstance } from "services/game";
 
-const usePlayerToAct = (players: Player[]) => {
+const usePlayerToAct = () => {
   const socket = getSocketInstance();
 
   const [playerToAct, setPlayerToAct] = useState<Player>();

@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import joinTable from "services/game";
-import { Player } from "@poker-web/types";
 import Table from "features/Table/Table";
+import { PlayersList } from "@poker-web/types/table/table";
 function App() {
   const [joinedTable, setJoinedTable] = useState(false);
   const [currentPlayer, setCurrentPlayer] = useState("");
-  const [players, setPlayers] = useState<Player[]>();
+  const [players, setPlayers] = useState<PlayersList>();
   const onSubmit = (e: React.SyntheticEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);

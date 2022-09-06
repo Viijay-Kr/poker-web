@@ -98,7 +98,7 @@ const ActionContainer = styled.div`
   justify-content: space-between;
   position: absolute;
   bottom: 5%;
-  right: 25%;
+  right: 0%;
 `;
 
 export default PlayerActions;

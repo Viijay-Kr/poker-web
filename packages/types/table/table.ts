@@ -1,11 +1,13 @@
 import { Card } from "../cards/cards";
 import { Player } from "../players/player";
 
-export type JoinedTableFunc = (players: Player[]) => void;
+export type PlayerEntity = { player: Player; next: Player | null };
+export type PlayersList = Array<PlayerEntity>;
+export type JoinedTableFunc = (players: PlayersList) => void;
 export type Actions = "call" | "fold" | "raise" | "check";
 
 export interface JoinedTable {
-  players: Player[];
+  players: PlayersList;
 }
 
 export type PlayerAction =
@@ -36,7 +38,8 @@ export interface PlayerToActListenerParams {
 export interface OnPlayerActParams {
   player: Player;
   action: PlayerAction;
-  customBet?: number;
+  // TODO refactor this
+  customRaise?: number;
 }
 
 export type CommunityCardsStatus = "preflop" | "flop" | "turn" | "river";

@@ -5,33 +5,132 @@ import {
   OnPlayerActParams,
   Players,
   PlayerAction,
+  Player,
+  Actions,
 } from "@poker-web/types";
 import { toPlayersList } from "../utils";
 import { deal, getFlop, getRiver, getTurn, refreshCards } from "./cards";
 import { computeWinner } from "./compute_winner";
 
-let communityCardsStatus: CommunityCardsStatus = "preflop";
-let communityCards: Card[] = [];
-let hands = 0;
-let preFlop = true;
+let communityCardsStatus: CommunityCardsStatus;
+let communityCards: Card[];
+let hands: number;
+let preFlop: boolean;
+let isHeadsUp: boolean;
+let smallBlindValue: number;
+let bigBlindValue: number;
+let pot: number;
 
-const smallBlindValue = 2;
-const bigBlindValue = 4;
-let pot = 0;
-let currentActionInPlay: PlayerAction;
+export const defineGlobals = (players: Players) => {
+  communityCardsStatus = "preflop";
+  communityCards = [];
+  hands = 1;
+  preFlop = true;
+  isHeadsUp = players.size === 2;
+  smallBlindValue = 2;
+  bigBlindValue = 4;
+  pot = 6;
+};
 
-let rounds = 0;
+export const overRideGlobals = ({
+  communityCardsStatus,
+  hands,
+  preFlop,
+  isHeadsUp,
+  pot,
+}: {
+  communityCardsStatus: CommunityCardsStatus;
+  hands: number;
+  preFlop: boolean;
+  isHeadsUp: boolean;
+  pot: number;
+}) => {
+  communityCardsStatus = communityCardsStatus;
+  hands = hands;
+  preFlop = preFlop;
+  isHeadsUp = isHeadsUp;
+  pot = pot;
+};
 
-const getActOptionsForNextPlayerToAct = (
-  isPlayerBigBlind?: boolean
+const computeAmountToCallOnEveryRound = ({
+  raiseOnPlay,
+  isSmallBlind,
+  isBigBlind,
+}: {
+  raiseOnPlay?: number;
+  isSmallBlind?: boolean;
+  isBigBlind?: boolean;
+}) => {
+  if (isHeadsUp) {
+    if (preFlop && raiseOnPlay) {
+      if (isBigBlind) {
+        return raiseOnPlay - smallBlindValue;
+      }
+      if (isSmallBlind) {
+        return raiseOnPlay;
+      }
+      return raiseOnPlay;
+    }
+    return smallBlindValue;
+  } else {
+    if (preFlop && raiseOnPlay) {
+      if (isSmallBlind) {
+        return raiseOnPlay - smallBlindValue;
+      }
+      if (isBigBlind) {
+        return raiseOnPlay - bigBlindValue;
+      }
+      return raiseOnPlay;
+    }
+    return bigBlindValue;
+  }
+};
+
+const computeAmountToRaiseOnRound = ({
+  raiseOnPlay,
+  isSmallBlind,
+  isBigBlind,
+}: {
+  raiseOnPlay?: number;
+  isSmallBlind?: boolean;
+  isBigBlind?: boolean;
+}) => {
+  if (raiseOnPlay) {
+    if (preFlop) {
+      if (isSmallBlind) {
+        return raiseOnPlay - smallBlindValue + bigBlindValue;
+      } else if (isBigBlind) {
+        return raiseOnPlay * 2 - bigBlindValue;
+      }
+    }
+    return raiseOnPlay / 2 + raiseOnPlay;
+  }
+  if (preFlop) {
+    if (isSmallBlind) {
+      return smallBlindValue + bigBlindValue;
+    } else if (isBigBlind) {
+      return bigBlindValue;
+    } else {
+      return bigBlindValue * 2;
+    }
+  }
+
+  return bigBlindValue;
+};
+
+export const getActOptionsForPlayerToAct = (
+  player: Player,
+  currentPotValue: number,
+  action?: PlayerAction
 ): PlayerAction[] | [] => {
-  const action = currentActionInPlay;
-  switch (action.option) {
+  const isPlayerBigBlind = player.bigBlind;
+  const isPlayerSmallBlind = player.smallBlind;
+  switch (action?.option) {
     case "call": {
       // handle the first round action here
       // big blind can check/raise
-      const option: PlayerAction =
-        isPlayerBigBlind && rounds === 0
+      const callOrCheckOption: PlayerAction =
+        preFlop && isPlayerBigBlind
           ? {
               option: "check",
             }
@@ -40,15 +139,15 @@ const getActOptionsForNextPlayerToAct = (
               amountToAct: action.amountToAct,
             };
       return [
-        option,
+        callOrCheckOption,
         {
           option: "raise",
           amountToAct: {
-            min: bigBlindValue,
+            min: computeAmountToRaiseOnRound({
+              isBigBlind: isPlayerBigBlind,
+              isSmallBlind: isPlayerSmallBlind,
+            }),
           },
-        },
-        {
-          option: "fold",
         },
       ];
     }
@@ -56,12 +155,20 @@ const getActOptionsForNextPlayerToAct = (
       return [
         {
           option: "call",
-          amountToAct: action.amountToAct.min,
+          amountToAct: computeAmountToCallOnEveryRound({
+            raiseOnPlay: action.amountToAct.min,
+            isBigBlind: isPlayerBigBlind,
+            isSmallBlind: isPlayerSmallBlind,
+          }),
         },
         {
           option: "raise",
           amountToAct: {
-            min: action.amountToAct.min,
+            min: computeAmountToRaiseOnRound({
+              raiseOnPlay: action.amountToAct.min,
+              isSmallBlind: isPlayerSmallBlind,
+              isBigBlind: isPlayerBigBlind,
+            }),
           },
         },
         {
@@ -77,105 +184,158 @@ const getActOptionsForNextPlayerToAct = (
         {
           option: "raise",
           amountToAct: {
-            min: bigBlindValue,
+            min: computeAmountToRaiseOnRound({}),
           },
         },
       ];
     }
     default:
-      return [];
+      break;
+  }
+  if (preFlop) {
+    // small blind will have options to call/raise/fold
+    return [
+      {
+        option: "call",
+        amountToAct: isPlayerSmallBlind
+          ? smallBlindValue
+          : computeAmountToCallOnEveryRound({
+              isBigBlind: isPlayerBigBlind,
+              isSmallBlind: isPlayerSmallBlind,
+              raiseOnPlay: bigBlindValue,
+            }),
+      },
+      {
+        option: "raise",
+        amountToAct: {
+          min: computeAmountToRaiseOnRound({
+            isSmallBlind: isPlayerSmallBlind,
+            isBigBlind: isPlayerBigBlind,
+            raiseOnPlay: 4,
+          }),
+        },
+      },
+      { option: "fold" },
+    ];
+  } else {
+    return [
+      { option: "check" },
+      {
+        option: "raise",
+        amountToAct: {
+          min: computeAmountToRaiseOnRound({
+            isSmallBlind: isPlayerSmallBlind,
+            isBigBlind: isPlayerBigBlind,
+          }),
+        },
+      },
+    ];
   }
 };
 
 const computeBlinds = (players: Players) => {
   const playersList = toPlayersList(players);
-  const smallBlind = playersList.find((player) => player.smallBlind);
-  const bigBlind = playersList.find((player) => player.bigBlind);
-  const bigBlindPosition = playersList.findIndex((player) => player.bigBlind);
-  if (!smallBlind) {
-    const player1 = playersList[0];
-    players.set(player1.id, {
-      ...player1,
-      chips: player1.chips - 2,
-      smallBlind: true,
-    });
-  }
-  if (players.size > 1 && !bigBlind) {
-    const player2 = playersList[1];
-    players.set(player2.id, {
-      ...player2,
-      chips: player2.chips - 4,
-      bigBlind: true,
-    });
-  }
-  if (smallBlind && bigBlind && rounds > 0) {
-    players.set(bigBlind.id, {
-      ...bigBlind,
-      chips: bigBlind.chips - 2,
-      smallBlind: true,
-      bigBlind: false,
-    });
-    let nextBigBlind;
-    if (players.size > 2) {
-      // if there more than 2 players assign the big blind the player next to big blind
-      nextBigBlind = playersList[bigBlindPosition + 1];
-    } else {
-      nextBigBlind = playersList[0];
-    }
-    players.set(nextBigBlind.id, {
-      ...nextBigBlind,
-      chips: nextBigBlind.chips - 4,
-      bigBlind: true,
-      smallBlind: false,
-      hasActedThisRound: true,
-    });
-  }
-  pot = 6;
-};
-
-const startRound = ({ io, players }: { io: Server; players: Players }) => {
-  // The player next to big blind will start the round pre flop
-  // Else the small blind always starts the round
-  const playersList = toPlayersList(players);
-  let playerToStart;
+  const smallBlind = playersList.find(({ player }) => player.smallBlind);
+  const bigBlind = playersList.find(({ player }) => player.bigBlind);
   if (players.size > 1) {
-    if (preFlop) {
-      const bigBlindIndex = playersList.findIndex(({ bigBlind }) => !!bigBlind);
-
-      if (players.size > 2) {
-        if (rounds < 1) {
-          playerToStart = playersList[bigBlindIndex + 1];
-        } else {
-          // handle the post flop here
-          playerToStart = playersList.find(({ smallBlind }) => !!smallBlind);
-        }
-      } else {
-        // Small blind will start the round in heads up
-        // preflop will be small blind and post flop will be big blind to act
-        if (rounds >= 1) {
-          playerToStart = playersList[bigBlindIndex];
-        } else {
-          playerToStart = playersList.find(({ smallBlind }) => !!smallBlind);
+    if (hands === 1) {
+      // In first hand assign the first player to small blind and the second player to big blind
+      const player1 = playersList[0];
+      players.set(player1.player.id, {
+        ...player1,
+        player: {
+          ...player1.player,
+          chips: player1.player.chips - smallBlindValue,
+          smallBlind: true,
+        },
+      });
+      if (players.size > 1) {
+        const player2 = playersList[1];
+        players.set(player2.player.id, {
+          ...player2,
+          player: {
+            ...player2.player,
+            chips: player2.player.chips - bigBlindValue,
+            bigBlind: true,
+          },
+        });
+      }
+    } else {
+      // Next hands assingn the small and big in a circular order
+      if (smallBlind && bigBlind && smallBlind.next && bigBlind.next) {
+        // In the next hand the player next to small blind will be small blind
+        // The player next to bigblind will be big blind
+        players.set(smallBlind.next.id, {
+          ...smallBlind,
+          player: {
+            ...smallBlind.next,
+            chips: smallBlind.next.chips - smallBlindValue,
+            smallBlind: true,
+            bigBlind: false,
+          },
+        });
+        players.set(bigBlind.next.id, {
+          ...bigBlind,
+          player: {
+            ...bigBlind.next,
+            chips: bigBlind.next.chips - bigBlindValue,
+            bigBlind: true,
+            smallBlind: false,
+          },
+        });
+        if (!isHeadsUp) {
+          players.set(smallBlind.player.id, {
+            ...smallBlind,
+            player: {
+              ...smallBlind.player,
+              smallBlind: false,
+              bigBlind: false,
+              button: true,
+            },
+          });
         }
       }
     }
+    pot = 6;
   }
-  if (playerToStart) {
-    if (rounds === 0) {
-      currentActionInPlay = {
-        option: "call",
-        amountToAct: smallBlindValue,
-      };
-    } else {
-      // always start with check
-      currentActionInPlay = {
-        option: "check",
-      };
+};
+
+const startRound = ({ io, players }: { io: Server; players: Players }) => {
+  const playersList = toPlayersList(players);
+  let playerToStart;
+  isHeadsUp = players.size === 2;
+  const bigBlind = playersList.find(({ player: { bigBlind } }) => !!bigBlind);
+  const smallBlind = playersList.find(
+    ({ player: { smallBlind } }) => !!smallBlind
+  );
+  if (players.size > 1) {
+    if (smallBlind && bigBlind && bigBlind.next) {
+      if (isHeadsUp) {
+        if (preFlop) {
+          // Small blind starts the round
+          playerToStart = smallBlind.player;
+        } else {
+          playerToStart = bigBlind.player;
+        }
+      } else {
+        if (preFlop) {
+          // Player next to big blind starts the round
+          playerToStart = bigBlind.next;
+        } else {
+          playerToStart = smallBlind.player;
+        }
+      }
     }
-    io.sockets.emit("on_player_to_act", {
-      playerToAct: playerToStart,
-      actions: getActOptionsForNextPlayerToAct(),
-    });
+    if (playerToStart) {
+      try {
+        io.sockets.emit("on_player_to_act", {
+          playerToAct: playerToStart,
+          actions: getActOptionsForPlayerToAct(playerToStart, pot),
+        });
+      } catch (err) {
+        // console.error((err as Unkno).message);
+      }
+    }
   }
 };
 
@@ -190,9 +350,11 @@ const onPlayerAct = ({
 }) => {
   socket.on(
     "on_player_act",
-    ({ player, action, customBet }: OnPlayerActParams) => {
+    ({ player, action: action, customRaise: maxRaise }: OnPlayerActParams) => {
       let hasPlayerRaised = false;
       const currentPlayerId = player.id;
+      const currentPlayer = players.get(player.id)!;
+      let currentActionInPlay: PlayerAction;
       switch (action.option) {
         case "call": {
           player.chips -= action.amountToAct;
@@ -202,16 +364,14 @@ const onPlayerAct = ({
           break;
         }
         case "raise": {
-          player.chips -= customBet || action.amountToAct.min;
-          pot += customBet || action.amountToAct.min;
+          player.chips -= maxRaise || action.amountToAct.min;
+          pot += maxRaise || action.amountToAct.min;
           hasPlayerRaised = true;
           player.hasActedThisRound = true;
           currentActionInPlay = {
             option: "raise",
             amountToAct: {
-              min: customBet
-                ? customBet - action.amountToAct.min
-                : action.amountToAct.min,
+              min: maxRaise || action.amountToAct.min,
             },
           };
           break;
@@ -228,38 +388,39 @@ const onPlayerAct = ({
           break;
       }
       players.set(player.id, {
-        ...player,
+        ...currentPlayer,
+        player: {
+          ...player,
+        },
       });
-      const playersList = toPlayersList(players);
-      const nextPlayerToAct = toPlayersList(players).find(
-        (player) => !player.hasActedThisRound
-      );
+
+      const nextPlayerToAct = players.get(currentPlayer.next!.id)!;
+      // If a player raises then all the other players have to act on it and only the initial raiser has finished acting
       if (hasPlayerRaised) {
-        playersList.forEach(
-          (player) =>
+        players.forEach(
+          ({ player, next }) =>
             player.id !== currentPlayerId &&
             players.set(player.id, {
-              ...player,
-              hasActedThisRound: false,
+              next,
+              player: {
+                ...player,
+                hasActedThisRound: false,
+              },
             })
         );
       }
       const hasAllPlayersActedThisRound = toPlayersList(players).every(
-        (player) => player.hasActedThisRound
+        ({ player }) => player.hasActedThisRound
       );
 
       if (hasAllPlayersActedThisRound) {
         // if all the players have acted do the community cards
-        console.log(
-          ">>> hasAllPlayersActedThisRound",
-          hasAllPlayersActedThisRound,
-          communityCardsStatus
-        );
         switch (communityCardsStatus) {
           case "preflop":
             // emit flop cards here
             communityCards = getFlop();
             communityCardsStatus = "flop";
+            preFlop = false;
             break;
           case "flop":
             communityCards = communityCards.concat(getTurn());
@@ -273,9 +434,13 @@ const onPlayerAct = ({
             // Once all players acted compute the winner here
             const winner = computeWinner(players, communityCards);
             if (winner?.winningPlayer) {
+              const playerWon = players.get(winner.winningPlayer.id)!;
               players.set(winner.winningPlayer.id, {
-                ...winner.winningPlayer,
-                chips: winner.winningPlayer.chips + pot,
+                ...playerWon,
+                player: {
+                  ...winner.winningPlayer,
+                  chips: winner.winningPlayer.chips + pot,
+                },
               });
             }
             io.sockets.emit("winner", {
@@ -287,18 +452,21 @@ const onPlayerAct = ({
           default:
             break;
         }
-        players.forEach((player, key) =>
+        players.forEach(({ player, next }, key) =>
           players.set(key, {
-            ...player,
-            hasActedThisRound: false,
+            next,
+            player: { ...player, hasActedThisRound: false },
           })
         );
-        rounds++;
         startRound({ io, players });
       } else if (nextPlayerToAct) {
         io.sockets.emit("on_player_to_act", {
-          playerToAct: nextPlayerToAct,
-          actions: getActOptionsForNextPlayerToAct(nextPlayerToAct.bigBlind),
+          playerToAct: nextPlayerToAct.player,
+          actions: getActOptionsForPlayerToAct(
+            nextPlayerToAct.player,
+            pot,
+            currentActionInPlay
+          ),
         });
       }
       io.sockets.emit("community_cards", {
@@ -315,14 +483,17 @@ const onPlayerAct = ({
 
 const refreshGame = (players: Players, io: Server) => {
   refreshCards();
-  rounds = 0;
   hands++;
-  players.forEach((player) => {
+  players.forEach(({ player, next }) => {
     players.set(player.id, {
-      ...player,
-      cards: deal(),
+      next,
+      player: {
+        ...player,
+        cards: deal(),
+      },
     });
   });
+  preFlop = true;
   communityCards = [];
   communityCardsStatus = "preflop";
   computeBlinds(players);

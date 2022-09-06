@@ -1,6 +1,6 @@
-export { Player, Players } from "./players/player";
+export type { Player, Players } from "./players/player";
 
-export {
+export type {
   JoinedTableFunc,
   JoinedTable,
   Actions,
@@ -12,4 +12,4 @@ export {
   CommunityCardsParams,
 } from "./table/table";
 
-export { Kind, Suit, Card, Flush, Straight } from "./cards/cards";
+export type { Kind, Suit, Card, Flush, Straight } from "./cards/cards";

@@ -12,4 +12,4 @@ export interface Player {
   hasActedThisRound: boolean;
 }
 
-export type Players = Map<string, Player>;
+export type Players = Map<string, { player: Player; next: Player | null }>;

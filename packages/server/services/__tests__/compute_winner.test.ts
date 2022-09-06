@@ -1,7 +1,7 @@
 import { Card, Players } from "@poker-web/types";
 import { computeWinner } from "../compute_winner";
 
-describe("Test compute winner", () => {
+describe.skip("Test compute winner", () => {
   it("should return a winner player based on high card", () => {
     const players: Players = new Map();
     players.set("player_1", {

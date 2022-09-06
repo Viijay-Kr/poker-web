@@ -1,5 +1,4 @@
 import React, { useEffect } from "react";
-import { Player } from "@poker-web/types";
 import styled, { css } from "styled-components";
 import CurrentPlayer from "components/molecules/CurrentPlayer";
 import OpponentPlayer from "components/molecules/Opponents";
@@ -8,13 +7,14 @@ import { useCommunityCards } from "./hooks/useCommunityCards";
 import { useWinner } from "./hooks/useWinner";
 import PlayerActions from "features/Table/components/PlayerActions";
 import CommunityCards from "features/Table/components/CommunityCards";
+import { PlayersList } from "@poker-web/types/table/table";
 interface Props {
-  players: Player[];
+  players: PlayersList;
   currentPlayerName: string;
 }
 const Table: React.FC<Props> = (props) => {
   const { players, currentPlayerName } = props;
-  const { actions, playerToAct, onAction } = usePlayerToAct(players);
+  const { actions, playerToAct, onAction } = usePlayerToAct();
   const { communityCards, potSize } = useCommunityCards();
   const winner = useWinner();
 
@@ -25,7 +25,7 @@ const Table: React.FC<Props> = (props) => {
   }, [winner]);
   return (
     <TableWrapper>
-      {players.map((player, index) => (
+      {players.map(({ player }, index) => (
         <StyledPlayer playerIndex={index}>
           {player.name === currentPlayerName ? (
             <CurrentPlayer key={player.id} player={player} />
